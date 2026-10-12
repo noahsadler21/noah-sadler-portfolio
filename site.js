@@ -3,6 +3,24 @@
   const root = document.documentElement, box = document.getElementById("box"),
     index = document.getElementById("index"), srcs = document.getElementById("srcs"), brief = document.getElementById("brief");
   const narrow = matchMedia("(max-width:900px)");
+  // Safari (macOS) and every iPhone/iPad browser get script-placed text layers instead of screen-fixed ones.
+  // Add ?nofixed to the address to try that path in any browser.
+  const ua = navigator.userAgent;
+  const iOS = /iP(hone|ad|od)/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const safari = /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|OPR|Firefox/.test(ua);
+  const NOFIXED = iOS || safari || /[?&]nofixed/.test(location.search);
+  if (NOFIXED) root.classList.add("nofixed");
+  const LAYERED = ".flip, #index a, #srcs a, #index .reset, #index .scale button, #index .scale span, main p, main h1, main h2, main figcaption, main .pending, main .row > div";
+  function syncLayers() {   // tell each visible text element where it sits on screen
+    if (!NOFIXED || narrow.matches) return;   // phones use plain gray text, no layers
+    const H = innerHeight;
+    for (const el of document.querySelectorAll(LAYERED)) {
+      const r = el.getBoundingClientRect();
+      if (r.bottom < -50 || r.top > H + 50) continue;
+      el.style.setProperty("--ox", r.left + "px"); el.style.setProperty("--oy", r.top + "px");
+    }
+  }
+  if (NOFIXED) { addEventListener("scroll", syncLayers, { passive: true }); addEventListener("resize", syncLayers); }
   // Which kind of pointer was used last (mouse, pen or touch), and double-tap detection for touch screens.
   var lastPointer = "mouse", lastTap = { t: 0, x: 0, y: 0 };
   addEventListener("pointerdown", e => { lastPointer = e.pointerType; }, true);
@@ -20,6 +38,7 @@
     root.style.setProperty("--x", x + "px"); root.style.setProperty("--y", y + "px");
     root.style.setProperty("--w", w + "px"); root.style.setProperty("--h", h + "px");
     box.classList.toggle("full", fw > 0.97 && fh > 0.97);
+    syncLayers();
     queueTabs();
   }
   function save() { try { localStorage.setItem("ns-box2", JSON.stringify({ fx, fy, fw, fh })); } catch (e) {} }
@@ -59,7 +78,7 @@
   const fullScreen = () => fw > 0.97 && fh > 0.97;   // nothing to move while it fills the screen
   const select = on => box.classList.toggle("selected", on);
   document.addEventListener("click", e => {
-    if (box.classList.contains("selected")) return;
+    if (narrow.matches || box.classList.contains("selected")) return;
     if (!fullScreen() && inBox(e.clientX, e.clientY) && !e.target.closest("a, button, figure, #box .h")) select(true);
   });
   document.addEventListener("pointerdown", e => { if (box.classList.contains("selected") && !inBox(e.clientX, e.clientY)) select(false); });
@@ -139,6 +158,7 @@
     if (!s) { ["--k", "--dx", "--dy"].forEach(p => f.style.removeProperty(p)); f.style.removeProperty("z-index"); return; }
     f.style.setProperty("--k", s.k.toFixed(3)); f.style.setProperty("--dx", s.dx + "px"); f.style.setProperty("--dy", s.dy + "px");
     if (s.z) f.style.zIndex = s.z;
+    syncLayers();
     queueTabs();
   }
   let selFig = null;
@@ -158,7 +178,7 @@
     else lastTap = { t: now, x: e.clientX, y: e.clientY };
   });
   const drag = (el, onMove, onEnd) => el.addEventListener("pointerdown", e => {
-    if (e.button > 0) return;
+    if (e.button > 0 || narrow.matches) return;   // phones: no dragging (the simple version)
     if (e.pointerType === "touch" && el.matches("img, video, .pending") && !el.closest("figure").classList.contains("sel")) return;
     try { el.setPointerCapture(e.pointerId); } catch (err) {}
     const x0 = e.clientX, y0 = e.clientY, ctx = onMove.start ? onMove.start(e) : null;
@@ -176,7 +196,10 @@
     mover.start = () => { selectFig(f); const s = st(f); return { dx: s.dx, dy: s.dy }; };
     drag(media, mover, () => { saveImgs(); layout(); });
     // touch: a tap selects the image (its tabs appear); dragging then moves it
-    media.addEventListener("click", () => { if (lastPointer === "touch") selectFig(f); });
+    media.addEventListener("click", () => {
+      if (narrow.matches) { if (f.dataset.full) open(f.dataset.full, "_blank", "noopener"); return; }   // phones: tap = full size
+      if (lastPointer === "touch") selectFig(f);
+    });
     // scale: four corner tabs
     for (const c of ["nw", "ne", "sw", "se"]) {
       const t = document.createElement("div");
@@ -248,7 +271,7 @@
   var tabsQueued = false;
   function queueTabs() { if (!tabsQueued) { tabsQueued = true; requestAnimationFrame(() => { tabsQueued = false; boxTabs(); }); } }
   addEventListener("scroll", queueTabs, { passive: true });
-  const layout = () => { indexTop(); set(); tabsToImage(); placeSources(); markCurrent(); boxTabs(); };
+  const layout = () => { indexTop(); set(); tabsToImage(); placeSources(); markCurrent(); boxTabs(); syncLayers(); };
   new ResizeObserver(layout).observe(document.querySelector("main"));
   new ResizeObserver(layout).observe(brief);
   addEventListener("resize", layout);
