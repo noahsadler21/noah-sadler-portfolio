@@ -1,0 +1,236 @@
+// Scalable white box (after Developer-Path's panel), image source numbers, and the Index's current-section mark.
+(function () {
+  const root = document.documentElement, box = document.getElementById("box"),
+    index = document.getElementById("index"), srcs = document.getElementById("srcs"), brief = document.getElementById("brief");
+  const narrow = matchMedia("(max-width:900px)");
+
+  // --- White box, fixed to the screen. Stored as fractions of the window so it keeps its place when the window resizes.
+  const MIN = 12;
+  let fx = 0, fy = 0, fw = 1, fh = 1;   // starts filling the screen, so the site opens on white
+  try { const s = JSON.parse(localStorage.getItem("ns-box2") || "null"); if (s && s.fw > 0 && s.fh > 0) ({ fx, fy, fw, fh } = s); } catch (e) {}
+  const vw = () => root.clientWidth, vh = () => window.innerHeight;
+  function set() {
+    if (narrow.matches) {   // phones: full-screen white, no handles
+      root.style.setProperty("--x", "0px"); root.style.setProperty("--y", "0px");
+      root.style.setProperty("--w", vw() + "px"); root.style.setProperty("--h", vh() + "px"); return;
+    }
+    const W = vw(), H = vh();
+    let w = Math.max(MIN, Math.min(W, fw * W)), h = Math.max(MIN, Math.min(H, fh * H));
+    let x = Math.max(0, Math.min(W - w, fx * W)), y = Math.max(0, Math.min(H - h, fy * H));
+    fx = x / W; fy = y / H; fw = w / W; fh = h / H;
+    root.style.setProperty("--x", x + "px"); root.style.setProperty("--y", y + "px");
+    root.style.setProperty("--w", w + "px"); root.style.setProperty("--h", h + "px");
+    box.classList.toggle("full", fw > 0.97 && fh > 0.97);
+    queueTabs();
+  }
+  function save() { try { localStorage.setItem("ns-box2", JSON.stringify({ fx, fy, fw, fh })); } catch (e) {} }
+  // Drag an edge to move that side; a corner moves its two sides. The opposite sides stay put, so the box scales from any side.
+  function apply(which, x0, y0, w0, h0, dx, dy) {
+    const W = vw(), H = vh();
+    let l = x0, t = y0, r = x0 + w0, b = y0 + h0;
+    if (which.includes("w")) l = Math.max(0, Math.min(r - MIN, x0 + dx));
+    if (which.includes("e")) r = Math.min(W, Math.max(l + MIN, x0 + w0 + dx));
+    if (which.includes("n")) t = Math.max(0, Math.min(b - MIN, y0 + dy));
+    if (which.includes("s")) b = Math.min(H, Math.max(t + MIN, y0 + h0 + dy));
+    fx = l / W; fy = t / H; fw = (r - l) / W; fh = (b - t) / H;
+    set();
+  }
+  for (const h of box.querySelectorAll(".h")) {
+    h.addEventListener("pointerdown", e => {
+      h.setPointerCapture(e.pointerId);
+      const W = vw(), H = vh(), x0 = fx * W, y0 = fy * H, w0 = fw * W, h0 = fh * H, px = e.clientX, py = e.clientY;
+      const move = ev => apply(h.dataset.h, x0, y0, w0, h0, ev.clientX - px, ev.clientY - py);
+      const up = () => { h.removeEventListener("pointermove", move); h.removeEventListener("pointerup", up); h.removeEventListener("pointercancel", up); save(); };
+      h.addEventListener("pointermove", move); h.addEventListener("pointerup", up); h.addEventListener("pointercancel", up);
+      e.preventDefault();
+    });
+    // Keyboard: arrow keys move the focused edge.
+    h.addEventListener("keydown", e => {
+      const k = { ArrowLeft: [-24, 0], ArrowRight: [24, 0], ArrowUp: [0, -24], ArrowDown: [0, 24] }[e.key];
+      if (!k) return;
+      const W = vw(), H = vh();
+      apply(h.dataset.h, fx * W, fy * H, fw * W, fh * H, k[0], k[1]);
+      e.preventDefault(); save();
+    });
+  }
+
+  // Select and move. Unselected, the box lets every click through to the page. A click on empty space inside it
+  // (not a link) selects it; selected, dragging inside moves it, and a plain click still reaches whatever is underneath.
+  const inBox = (x, y) => { const r = box.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; };
+  const fullScreen = () => fw > 0.97 && fh > 0.97;   // nothing to move while it fills the screen
+  const select = on => box.classList.toggle("selected", on);
+  document.addEventListener("click", e => {
+    if (narrow.matches || box.classList.contains("selected")) return;
+    if (!fullScreen() && inBox(e.clientX, e.clientY) && !e.target.closest("a, button, figure, #box .h")) select(true);
+  });
+  document.addEventListener("pointerdown", e => { if (box.classList.contains("selected") && !inBox(e.clientX, e.clientY)) select(false); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") select(false); });
+  box.addEventListener("pointerdown", e => {
+    if (e.target !== box || !box.classList.contains("selected")) return;   // handles do their own thing
+    box.setPointerCapture(e.pointerId);
+    const W = vw(), H = vh(), x0 = fx * W, y0 = fy * H, px = e.clientX, py = e.clientY;
+    let moved = false;
+    const move = ev => {
+      const dx = ev.clientX - px, dy = ev.clientY - py;
+      if (!moved && Math.hypot(dx, dy) < 3) return;
+      moved = true;
+      fx = Math.max(0, Math.min(W - fw * W, x0 + dx)) / W;
+      fy = Math.max(0, Math.min(H - fh * H, y0 + dy)) / H;
+      set();
+    };
+    const up = ev => {
+      box.removeEventListener("pointermove", move); box.removeEventListener("pointerup", up); box.removeEventListener("pointercancel", up);
+      if (moved) { save(); return; }
+      // a plain click: hand it to whatever sits under the box (so links inside it still work)
+      box.style.pointerEvents = "none";
+      const under = document.elementFromPoint(ev.clientX, ev.clientY);
+      box.style.pointerEvents = "";
+      const link = under && under.closest("a");
+      if (link) link.click();
+    };
+    box.addEventListener("pointermove", move); box.addEventListener("pointerup", up); box.addEventListener("pointercancel", up);
+    e.preventDefault();
+  });
+
+  // --- Scale (bottom of the Index): 100% down to 25%, remembered; keeps the reading position.
+  const STEPS = [1, 0.75, 0.5, 0.35, 0.25];
+  let zIdx = 0;
+  try { zIdx = Math.max(0, STEPS.indexOf(+localStorage.getItem("ns-zoom") || 1)); } catch (e) {}
+  const Z = () => STEPS[zIdx];
+  const zLabel = index.querySelector(".scale .zv");
+  function setZoom(i, keepPlace = true) {
+    i = Math.max(0, Math.min(STEPS.length - 1, i));
+    const docH = document.documentElement.scrollHeight - innerHeight, ratio = docH > 0 ? scrollY / docH : 0;
+    zIdx = i; root.style.setProperty("--zoom", Z()); zLabel.textContent = Math.round(Z() * 100) + "%";
+    try { if (Z() === 1) localStorage.removeItem("ns-zoom"); else localStorage.setItem("ns-zoom", Z()); } catch (e) {}
+    if (typeof layout === "function") { layout(); if (keepPlace) scrollTo(0, ratio * (document.documentElement.scrollHeight - innerHeight)); }
+  }
+  index.querySelector(".scale .zo").addEventListener("click", () => setZoom(zIdx + 1));
+  index.querySelector(".scale .zi").addEventListener("click", () => setZoom(zIdx - 1));
+  root.style.setProperty("--zoom", Z()); zLabel.textContent = Math.round(Z() * 100) + "%";
+
+  // --- Images work like the white box: press to select and drag to move; corner tabs scale from any corner
+  // (proportions fixed, the opposite corner stays put). Moved images may overlap; the last one touched comes to the front.
+  // Per image we keep k (scale of the automatic size), dx/dy (offset from its place in the column) and z (stacking).
+  const figs = [...document.querySelectorAll("figure[data-n]")];
+  const probe = Object.assign(document.createElement("div"), { style: "position:absolute;visibility:hidden;height:0;width:var(--field)" });
+  document.body.appendChild(probe);
+  const fieldPx = () => probe.getBoundingClientRect().width;
+  let imgs = {};
+  try { imgs = JSON.parse(localStorage.getItem("ns-img") || "{}") || {}; } catch (e) {}
+  const saveImgs = () => { try { localStorage.setItem("ns-img", JSON.stringify(imgs)); } catch (e) {} };
+  let topZ = Math.max(4, ...Object.values(imgs).map(s => s.z || 0));
+  const st = f => (imgs[f.dataset.n] ||= { k: 1, dx: 0, dy: 0, z: 0 });
+  function paint(f) {
+    const s = imgs[f.dataset.n];
+    if (!s) { ["--k", "--dx", "--dy"].forEach(p => f.style.removeProperty(p)); f.style.removeProperty("z-index"); return; }
+    f.style.setProperty("--k", s.k.toFixed(3)); f.style.setProperty("--dx", s.dx + "px"); f.style.setProperty("--dy", s.dy + "px");
+    if (s.z) f.style.zIndex = s.z;
+    queueTabs();
+  }
+  let selFig = null;
+  function selectFig(f) {
+    if (selFig && selFig !== f) selFig.classList.remove("sel");
+    selFig = f;
+    if (f) { f.classList.add("sel"); const s = st(f); s.z = ++topZ; f.style.zIndex = s.z; }   // bring to the front
+  }
+  document.addEventListener("pointerdown", e => { if (selFig && !e.target.closest("figure")) selectFig(null); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") selectFig(null); });
+  // Double-click anywhere lets go of whatever is selected (an image or the white box), even when the box fills the page.
+  document.addEventListener("dblclick", () => { selectFig(null); select(false); getSelection && getSelection().removeAllRanges(); });
+  const drag = (el, onMove, onEnd) => el.addEventListener("pointerdown", e => {
+    if (narrow.matches || e.button > 0) return;
+    el.setPointerCapture(e.pointerId);
+    const x0 = e.clientX, y0 = e.clientY, ctx = onMove.start ? onMove.start(e) : null;
+    const move = ev => onMove(ev.clientX - x0, ev.clientY - y0, ctx);
+    const up = () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up); onEnd && onEnd(); };
+    el.addEventListener("pointermove", move); el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+    e.preventDefault(); e.stopPropagation();
+  });
+  for (const f of figs) {
+    paint(f);
+    const media = f.querySelector("img, video, .pending");
+    if (media.tagName === "IMG") media.draggable = false;
+    // move: press on the image selects it, and dragging moves it in the same motion
+    const mover = (dx, dy, c) => { const s = st(f); s.dx = c.dx + dx / Z(); s.dy = c.dy + dy / Z(); paint(f); };
+    mover.start = () => { selectFig(f); const s = st(f); return { dx: s.dx, dy: s.dy }; };
+    drag(media, mover, () => { saveImgs(); layout(); });
+    // scale: four corner tabs
+    for (const c of ["nw", "ne", "sw", "se"]) {
+      const t = document.createElement("div");
+      t.className = "t " + c; t.title = "Drag to scale";
+      f.appendChild(t);
+      const scaler = (dx, dy, k0) => {
+        const s = st(f), sign = c.includes("w") ? -1 : 1;
+        const w = Math.max(0.25 * k0.auto, Math.min(innerWidth / Z(), k0.w + sign * dx / Z()));   // up to the full screen width
+        s.k = w / k0.auto;
+        const dw = w - k0.w, dh = dw * k0.h / k0.w;
+        s.dx = k0.dx - (c.includes("w") ? dw : 0);   // keep the opposite corner where it was
+        s.dy = k0.dy - (c.includes("n") ? dh : 0);
+        paint(f);
+      };
+      scaler.start = () => { selectFig(f); const s = st(f), r = media.getBoundingClientRect(); return { w: r.width / Z(), h: r.height / Z(), auto: r.width / Z() / s.k, dx: s.dx, dy: s.dy }; };
+      drag(t, scaler, () => { saveImgs(); layout(); });
+    }
+  }
+
+  // --- Reset (bottom of the Index): images back in the column at their own size, the white box back to full screen.
+  index.querySelector(".reset").addEventListener("click", () => {
+    imgs = {}; selectFig(null); figs.forEach(paint);
+    fx = 0; fy = 0; fw = 1; fh = 1; box.classList.remove("selected");
+    try { localStorage.removeItem("ns-img"); localStorage.removeItem("ns-box2"); } catch (e) {}
+    setZoom(0, false);
+    layout();
+  });
+
+  // --- Source numbers: one per image, level with its top edge, opening the full-size file.
+  function placeSources() {
+    srcs.textContent = "";
+    const top0 = srcs.getBoundingClientRect().top + scrollY;
+    for (const f of figs) {
+      const d = document.createElement("div");
+      d.style.top = (f.getBoundingClientRect().top + scrollY - top0) + "px";
+      if (f.dataset.full) {
+        const a = document.createElement("a");
+        a.href = f.dataset.full; a.target = "_blank"; a.rel = "noopener"; a.textContent = f.dataset.n;
+        a.title = "Open full size"; d.appendChild(a);
+      } else d.textContent = f.dataset.n;
+      srcs.appendChild(d);
+    }
+  }
+
+  // --- Index: starts just under the top bar; the section in view stays bright while the others quiet down.
+  const indexTop = () => root.style.setProperty("--indexTop", (brief.offsetTop + brief.offsetHeight + 48) + "px");
+  const links = [...index.querySelectorAll('.inner > a:not(.lead)')];
+  const byId = new Map(links.filter(a => a.hash).map(a => [a.hash.slice(1), a]));
+  const sections = [...document.querySelectorAll("main section[id]")];
+  function markCurrent() {
+    const mid = innerHeight * 0.45;
+    let cur = null;
+    for (const s of sections) { const r = s.getBoundingClientRect(); if (r.top <= mid && r.bottom > mid) cur = s.id; }
+    links.forEach(a => a.removeAttribute("aria-current"));
+    if (cur && byId.get(cur)) byId.get(cur).setAttribute("aria-current", "true");
+    index.classList.toggle("has-current", !!cur);
+  }
+  addEventListener("scroll", markCurrent, { passive: true });
+
+  const tabsToImage = () => figs.forEach(f => f.style.setProperty("--mh", f.querySelector("img, video, .pending").offsetHeight + "px"));
+  // Box corner tabs: hidden wherever they sit over an image, unless the box is selected.
+  const corners = [...box.querySelectorAll(".nw, .ne, .sw, .se")];
+  const hit = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  function boxTabs() {
+    const media = figs.map(f => f.querySelector("img, video, .pending").getBoundingClientRect()).filter(r => r.bottom > 0 && r.top < innerHeight);
+    for (const c of corners) c.classList.toggle("under", media.some(r => hit(c.getBoundingClientRect(), r)));
+  }
+  // (a hoisted function, because images and the box are drawn before this point; the check itself runs a frame later)
+  var tabsQueued = false;
+  function queueTabs() { if (!tabsQueued) { tabsQueued = true; requestAnimationFrame(() => { tabsQueued = false; boxTabs(); }); } }
+  addEventListener("scroll", queueTabs, { passive: true });
+  const layout = () => { indexTop(); set(); tabsToImage(); placeSources(); markCurrent(); boxTabs(); };
+  new ResizeObserver(layout).observe(document.querySelector("main"));
+  new ResizeObserver(layout).observe(brief);
+  addEventListener("resize", layout);
+  addEventListener("load", layout);
+  narrow.addEventListener("change", layout);
+  layout();
+})();
