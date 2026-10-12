@@ -3,6 +3,9 @@
   const root = document.documentElement, box = document.getElementById("box"),
     index = document.getElementById("index"), srcs = document.getElementById("srcs"), brief = document.getElementById("brief");
   const narrow = matchMedia("(max-width:900px)");
+  // Which kind of pointer was used last (mouse, pen or touch), and double-tap detection for touch screens.
+  var lastPointer = "mouse", lastTap = { t: 0, x: 0, y: 0 };
+  addEventListener("pointerdown", e => { lastPointer = e.pointerType; }, true);
 
   // --- White box, fixed to the screen. Stored as fractions of the window so it keeps its place when the window resizes.
   const MIN = 12;
@@ -10,10 +13,6 @@
   try { const s = JSON.parse(localStorage.getItem("ns-box2") || "null"); if (s && s.fw > 0 && s.fh > 0) ({ fx, fy, fw, fh } = s); } catch (e) {}
   const vw = () => root.clientWidth, vh = () => window.innerHeight;
   function set() {
-    if (narrow.matches) {   // phones: full-screen white, no handles
-      root.style.setProperty("--x", "0px"); root.style.setProperty("--y", "0px");
-      root.style.setProperty("--w", vw() + "px"); root.style.setProperty("--h", vh() + "px"); return;
-    }
     const W = vw(), H = vh();
     let w = Math.max(MIN, Math.min(W, fw * W)), h = Math.max(MIN, Math.min(H, fh * H));
     let x = Math.max(0, Math.min(W - w, fx * W)), y = Math.max(0, Math.min(H - h, fy * H));
@@ -37,7 +36,7 @@
   }
   for (const h of box.querySelectorAll(".h")) {
     h.addEventListener("pointerdown", e => {
-      h.setPointerCapture(e.pointerId);
+      try { h.setPointerCapture(e.pointerId); } catch (err) {}
       const W = vw(), H = vh(), x0 = fx * W, y0 = fy * H, w0 = fw * W, h0 = fh * H, px = e.clientX, py = e.clientY;
       const move = ev => apply(h.dataset.h, x0, y0, w0, h0, ev.clientX - px, ev.clientY - py);
       const up = () => { h.removeEventListener("pointermove", move); h.removeEventListener("pointerup", up); h.removeEventListener("pointercancel", up); save(); };
@@ -60,14 +59,14 @@
   const fullScreen = () => fw > 0.97 && fh > 0.97;   // nothing to move while it fills the screen
   const select = on => box.classList.toggle("selected", on);
   document.addEventListener("click", e => {
-    if (narrow.matches || box.classList.contains("selected")) return;
+    if (box.classList.contains("selected")) return;
     if (!fullScreen() && inBox(e.clientX, e.clientY) && !e.target.closest("a, button, figure, #box .h")) select(true);
   });
   document.addEventListener("pointerdown", e => { if (box.classList.contains("selected") && !inBox(e.clientX, e.clientY)) select(false); });
   document.addEventListener("keydown", e => { if (e.key === "Escape") select(false); });
   box.addEventListener("pointerdown", e => {
     if (e.target !== box || !box.classList.contains("selected")) return;   // handles do their own thing
-    box.setPointerCapture(e.pointerId);
+    try { box.setPointerCapture(e.pointerId); } catch (err) {}
     const W = vw(), H = vh(), x0 = fx * W, y0 = fy * H, px = e.clientX, py = e.clientY;
     let moved = false;
     const move = ev => {
@@ -152,9 +151,16 @@
   document.addEventListener("keydown", e => { if (e.key === "Escape") selectFig(null); });
   // Double-click anywhere lets go of whatever is selected (an image or the white box), even when the box fills the page.
   document.addEventListener("dblclick", () => { selectFig(null); select(false); getSelection && getSelection().removeAllRanges(); });
+  document.addEventListener("pointerup", e => {   // double-tap = let go, like double-click
+    if (e.pointerType !== "touch") return;
+    const now = performance.now();
+    if (now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) { selectFig(null); select(false); lastTap.t = 0; }
+    else lastTap = { t: now, x: e.clientX, y: e.clientY };
+  });
   const drag = (el, onMove, onEnd) => el.addEventListener("pointerdown", e => {
-    if (narrow.matches || e.button > 0) return;
-    el.setPointerCapture(e.pointerId);
+    if (e.button > 0) return;
+    if (e.pointerType === "touch" && el.matches("img, video, .pending") && !el.closest("figure").classList.contains("sel")) return;
+    try { el.setPointerCapture(e.pointerId); } catch (err) {}
     const x0 = e.clientX, y0 = e.clientY, ctx = onMove.start ? onMove.start(e) : null;
     const move = ev => onMove(ev.clientX - x0, ev.clientY - y0, ctx);
     const up = () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up); onEnd && onEnd(); };
@@ -169,6 +175,8 @@
     const mover = (dx, dy, c) => { const s = st(f); s.dx = c.dx + dx / Z(); s.dy = c.dy + dy / Z(); paint(f); };
     mover.start = () => { selectFig(f); const s = st(f); return { dx: s.dx, dy: s.dy }; };
     drag(media, mover, () => { saveImgs(); layout(); });
+    // touch: a tap selects the image (its tabs appear); dragging then moves it
+    media.addEventListener("click", () => { if (lastPointer === "touch") selectFig(f); });
     // scale: four corner tabs
     for (const c of ["nw", "ne", "sw", "se"]) {
       const t = document.createElement("div");
