@@ -92,22 +92,36 @@
     e.preventDefault();
   });
 
-  // --- Scale (bottom of the Index): 100% down to 25%, remembered; keeps the reading position.
-  const STEPS = [1, 0.75, 0.5, 0.35, 0.25];
-  let zIdx = 0;
-  try { zIdx = Math.max(0, STEPS.indexOf(+localStorage.getItem("ns-zoom") || 1)); } catch (e) {}
-  const Z = () => STEPS[zIdx];
+  // --- Scale (bottom of the Index, or Alt + scroll): the projects column zooms smoothly from 100% down to 25%.
+  // Remembered between visits; Alt + scroll zooms around the pointer so what's under it stays put.
+  const STEPS = [1, 0.75, 0.5, 0.35, 0.25], ZMIN = 0.25, ZMAX = 1;
+  let zoom = 1;
+  try { const v = +localStorage.getItem("ns-zoom"); if (v >= ZMIN && v <= ZMAX) zoom = v; } catch (e) {}
+  const Z = () => zoom;
   const zLabel = index.querySelector(".scale .zv");
-  function setZoom(i, keepPlace = true) {
-    i = Math.max(0, Math.min(STEPS.length - 1, i));
-    const docH = document.documentElement.scrollHeight - innerHeight, ratio = docH > 0 ? scrollY / docH : 0;
-    zIdx = i; root.style.setProperty("--zoom", Z()); zLabel.textContent = Math.round(Z() * 100) + "%";
-    try { if (Z() === 1) localStorage.removeItem("ns-zoom"); else localStorage.setItem("ns-zoom", Z()); } catch (e) {}
-    if (typeof layout === "function") { layout(); if (keepPlace) scrollTo(0, ratio * (document.documentElement.scrollHeight - innerHeight)); }
+  const showZoom = () => { root.style.setProperty("--zoom", zoom); zLabel.textContent = Math.round(zoom * 100) + "%"; };
+  function applyZoom(v, anchorY = innerHeight / 2) {
+    v = Math.max(ZMIN, Math.min(ZMAX, v));
+    if (Math.abs(v - zoom) < 1e-4) return;
+    const de = document.documentElement, docY = scrollY + anchorY, h0 = de.scrollHeight;
+    zoom = v; showZoom();
+    try { if (zoom === 1) localStorage.removeItem("ns-zoom"); else localStorage.setItem("ns-zoom", zoom.toFixed(3)); } catch (e) {}
+    layout();
+    scrollTo(0, docY * de.scrollHeight / h0 - anchorY);
   }
-  index.querySelector(".scale .zo").addEventListener("click", () => setZoom(zIdx + 1));
-  index.querySelector(".scale .zi").addEventListener("click", () => setZoom(zIdx - 1));
-  root.style.setProperty("--zoom", Z()); zLabel.textContent = Math.round(Z() * 100) + "%";
+  // the buttons step to the next level from wherever the zoom is now
+  index.querySelector(".scale .zo").addEventListener("click", () => applyZoom(STEPS.find(s => s < zoom - 1e-3) ?? ZMIN));
+  index.querySelector(".scale .zi").addEventListener("click", () => applyZoom([...STEPS].reverse().find(s => s > zoom + 1e-3) ?? ZMAX));
+  let altZoomed = false;
+  addEventListener("wheel", e => {
+    if (!e.altKey || narrow.matches) return;
+    e.preventDefault();
+    altZoomed = true;
+    applyZoom(zoom * Math.exp(-e.deltaY * 0.0015), e.clientY);
+  }, { passive: false });
+  // releasing Alt after zooming shouldn't jump focus to the browser's menu
+  addEventListener("keyup", e => { if (e.key === "Alt" && altZoomed) { e.preventDefault(); altZoomed = false; } });
+  showZoom();
 
   // --- Images work like the white box: press to select and drag to move; corner tabs scale from any corner
   // (proportions fixed, the opposite corner stays put). Moved images may overlap; the last one touched comes to the front.
@@ -179,7 +193,7 @@
     imgs = {}; selectFig(null); figs.forEach(paint);
     fx = 0; fy = 0; fw = 1; fh = 1; box.classList.remove("selected");
     try { localStorage.removeItem("ns-img"); localStorage.removeItem("ns-box2"); } catch (e) {}
-    setZoom(0, false);
+    applyZoom(1);
     layout();
   });
 
