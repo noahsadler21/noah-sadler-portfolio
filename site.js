@@ -8,11 +8,13 @@
   const ua = navigator.userAgent;
   const iOS = /iP(hone|ad|od)/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const safari = /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|OPR|Firefox/.test(ua);
-  const NOFIXED = iOS || safari || /[?&]nofixed/.test(location.search);
-  if (NOFIXED) root.classList.add("nofixed");
+  const NOFIXED_BASE = iOS || safari || /[?&]nofixed/.test(location.search);
+  const nofixed = () => NOFIXED_BASE || narrow.matches;   // phones too
+  root.classList.toggle("nofixed", nofixed());
+  narrow.addEventListener("change", () => root.classList.toggle("nofixed", nofixed()));
   const LAYERED = ".flip, #index a, #srcs a, #index .reset, #index .scale button, #index .scale span, main p, main h1, main h2, main figcaption, main .pending, main .row > div";
   function syncLayers() {   // tell each visible text element where it sits on screen
-    if (!NOFIXED || narrow.matches) return;   // phones use plain gray text, no layers
+    if (!nofixed()) return;
     const H = innerHeight;
     for (const el of document.querySelectorAll(LAYERED)) {
       const r = el.getBoundingClientRect();
@@ -20,7 +22,7 @@
       el.style.setProperty("--ox", r.left + "px"); el.style.setProperty("--oy", r.top + "px");
     }
   }
-  if (NOFIXED) { addEventListener("scroll", syncLayers, { passive: true }); addEventListener("resize", syncLayers); }
+  addEventListener("scroll", syncLayers, { passive: true }); addEventListener("resize", syncLayers);
   // Which kind of pointer was used last (mouse, pen or touch), and double-tap detection for touch screens.
   var lastPointer = "mouse", lastTap = { t: 0, x: 0, y: 0 };
   addEventListener("pointerdown", e => { lastPointer = e.pointerType; }, true);
@@ -31,6 +33,12 @@
   try { const s = JSON.parse(localStorage.getItem("ns-box2") || "null"); if (s && s.fw > 0 && s.fh > 0) ({ fx, fy, fw, fh } = s); } catch (e) {}
   const vw = () => root.clientWidth, vh = () => window.innerHeight;
   function set() {
+    if (narrow.matches) {   // phones: the scroll-through window, 72% wide and 30% tall, centred
+      const W = vw(), H = vh(), w = Math.round(W * 0.72), h = Math.round(H * 0.3);
+      root.style.setProperty("--x", Math.round((W - w) / 2) + "px"); root.style.setProperty("--y", Math.round((H - h) / 2) + "px");
+      root.style.setProperty("--w", w + "px"); root.style.setProperty("--h", h + "px");
+      box.classList.remove("full", "selected"); syncLayers(); return;
+    }
     const W = vw(), H = vh();
     let w = Math.max(MIN, Math.min(W, fw * W)), h = Math.max(MIN, Math.min(H, fh * H));
     let x = Math.max(0, Math.min(W - w, fx * W)), y = Math.max(0, Math.min(H - h, fy * H));

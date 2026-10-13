@@ -179,19 +179,18 @@ html.nofixed main :is(p, h1, h2, figcaption, .pending, .row > div){background-at
 html{touch-action:manipulation}
 figure img{-webkit-touch-callout:none}
 
-/* ---- Phones (under 900px wide): a simpler version. Plain white page, gray text, images stacked full width
-   (tap one to open it full size). No white box, no dragging or scaling, so nothing fights the touch screen. ---- */
+/* ---- Phones (under 900px wide): no dragging. A white window sits fixed in the middle of the screen and the page
+   scrolls through it; text flips to gray inside it, white outside. Images stack full width (tap one for full size)
+   and their numbers sit on the right edge. ---- */
 @media (max-width:900px){
-  html{background:var(--fg)}
-  #box,#boxfill{display:none}
-  .flip,#index a,#srcs a,#index .reset,#index .scale button,#index .scale span,
-  main :is(p, h1, h2, figcaption, .pending, .row > div),
-  #index.has-current .inner > a:not(.lead):not([aria-current]){color:var(--bg)!important;background:none!important;-webkit-background-clip:border-box!important;background-clip:border-box!important}
-  #index.has-current .inner > a:not(.lead):not([aria-current]){opacity:.55}
+  #box{display:none}
   #index .reset,#index .scale{display:none!important}
   main{zoom:1!important}
   figure{left:0!important;top:0!important;width:100%!important;z-index:auto!important;box-shadow:none!important}
   figure .t{display:none!important}
   figure img,figure video{cursor:zoom-in;touch-action:auto}
+  body{padding-right:2.4em}
+  #srcs{display:block;right:6px;width:2em}
+  .cite{display:none!important}
 }
 
