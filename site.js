@@ -29,7 +29,12 @@
 
   // --- Invert: double-click the white box (double-tap the window on phones) to swap the page and box colours.
   try { if (localStorage.getItem("ns-invert") === "1") root.classList.add("inverted"); } catch (e) {}
+  // iPhones report one double-tap twice (a touch double-tap and a dblclick), so a second invert within 600ms is ignored
+  let lastInvert = 0;
   function invert() {
+    const now = performance.now();
+    if (now - lastInvert < 600) return;
+    lastInvert = now;
     const on = root.classList.toggle("inverted");
     try { if (on) localStorage.setItem("ns-invert", "1"); else localStorage.removeItem("ns-invert"); } catch (e) {}
   }
@@ -191,7 +196,8 @@
   document.addEventListener("keydown", e => { if (e.key === "Escape") selectFig(null); });
   // Double-click anywhere lets go of whatever is selected (an image or the white box), even when the box fills the page.
   document.addEventListener("dblclick", e => {
-    if (inWhite(e.clientX, e.clientY) && !e.target.closest("figure, a, button, #box .h")) invert();
+    // touch screens handle double-taps in the pointerup handler below; this one is for the mouse
+    if (lastPointer !== "touch" && inWhite(e.clientX, e.clientY) && !e.target.closest("figure, a, button, #box .h")) invert();
     selectFig(null); select(false); getSelection && getSelection().removeAllRanges();
   });
   document.addEventListener("pointerup", e => {   // double-tap = let go, like double-click
