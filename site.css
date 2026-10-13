@@ -3,6 +3,7 @@
    After info.cern.ch: plain heading, links always underlined, nothing else. */
 :root{
   --bg:#4b4b4d; --fg:#fff;   /* #4B4B4D: the text gray of the CV PDF */
+  --bg-q:rgba(75,75,77,.45); --fg-q:rgba(255,255,255,.45);   /* quieter versions (dimmed Index entries) */
   --font:Arial,"Helvetica Neue",Helvetica,sans-serif;
   --t12:12pt; --t10:10pt; --t9:9pt; --t8:8pt; --t7:7pt;
   --margin:2in;
@@ -44,7 +45,11 @@ figcaption{font-size:var(--t8);line-height:1.25;margin-top:.45em}
 /* Index: sits in the left margin where the reference keeps its font list; stays in view while scrolling */
 #index{position:absolute;top:var(--indexTop,48px);bottom:0;left:20px;width:calc(var(--margin) - 0.5in - 40px);font-size:var(--t8);line-height:1.3;text-align:right}
 #index .inner{position:sticky;top:48px}
-#index .lead{display:block;margin-bottom:.4em;font-size:var(--t9)}
+/* Index heading row: "Phone  Web" sits right next to "Index" */
+#index .head{display:flex;flex-direction:row-reverse;gap:1em;align-items:baseline;margin-bottom:.4em}
+#index .lead{display:block;font-size:var(--t9)}
+#index .view{display:inline-flex;gap:.6em;white-space:nowrap}
+#index .view button{font:inherit;font-size:var(--t8);padding:0;border:0;cursor:pointer;color:transparent;background:linear-gradient(var(--bg),var(--bg)) var(--x) var(--y) / var(--w) var(--h) no-repeat fixed, var(--fg);-webkit-background-clip:text;background-clip:text}
 #index a{display:block;margin-bottom:.15em;text-decoration:none}
 #index a:hover{text-decoration:none}
 
@@ -63,7 +68,7 @@ body{background:transparent}
 /* .flip paints text through the box layer. The Index links and image numbers get it directly: text inside a sticky or
    separately layered element isn't reached by a parent's clip. Quieter links use translucent versions of the same colors. */
 .flip,#index a,#srcs a{color:transparent;background:linear-gradient(var(--bg),var(--bg)) var(--x) var(--y) / var(--w) var(--h) no-repeat fixed, var(--fg);-webkit-background-clip:text;background-clip:text}
-#index.has-current .inner > a:not(.lead):not([aria-current]){background:linear-gradient(rgba(75,75,77,.45),rgba(75,75,77,.45)) var(--x) var(--y) / var(--w) var(--h) no-repeat fixed, rgba(255,255,255,.45);-webkit-background-clip:text;background-clip:text}
+#index.has-current .inner > a:not(.lead):not([aria-current]),#index .view button:not(.on){background:linear-gradient(var(--bg-q),var(--bg-q)) var(--x) var(--y) / var(--w) var(--h) no-repeat fixed, var(--fg-q);-webkit-background-clip:text;background-clip:text}
 /* main's box reaches half an inch left so the outdented openings sit inside the painted text area */
 main{margin-left:-0.5in;padding-left:0.5in}
 /* Scale (bottom of the Index): the projects column zooms out to show more of the page at once.
@@ -172,7 +177,7 @@ main p.intro{max-width:none;width:calc((100vw - var(--margin) - 5em) / var(--zoo
 
 /* Safari and every iPhone/iPad browser: background-attachment:fixed is unsupported or unreliable there, so each text
    element's layer is placed by the script (--ox/--oy = the element's position on screen) and scrolls with the element. */
-html.nofixed .flip,html.nofixed #index a,html.nofixed #srcs a,html.nofixed #index .reset,html.nofixed #index .scale button,html.nofixed #index .scale span,
+html.nofixed .flip,html.nofixed #index a,html.nofixed #srcs a,html.nofixed #index .reset,html.nofixed #index .scale button,html.nofixed #index .scale span,html.nofixed #index .view button,html.nofixed #index .view button:not(.on),
 html.nofixed #index.has-current .inner > a:not(.lead):not([aria-current]){background-attachment:scroll;background-position:calc(var(--x) - var(--ox, 0px)) calc(var(--y) - var(--oy, 0px))}
 html.nofixed main :is(p, h1, h2, figcaption, .pending, .row > div){background-attachment:scroll;background-position:calc((var(--x) - var(--ox, 0px)) / var(--zoom, 1)) calc((var(--y) - var(--oy, 0px)) / var(--zoom, 1))}
 /* iPhone: no double-tap page zoom (double-tap lets go of a selection), no save-image menu while moving images */
@@ -194,3 +199,12 @@ figure img{-webkit-touch-callout:none}
   .cite{display:none!important}
 }
 
+
+/* Double-click the white box: the page and the box swap colours (page white, box gray), and all text follows */
+html.inverted{--bg:#fff;--fg:#4b4b4d;--bg-q:rgba(255,255,255,.45);--fg-q:rgba(75,75,77,.45)}
+
+/* Phone preview on a computer ("Phone" next to Index): the site in a phone-sized frame in the middle of the screen */
+#phoneview{position:fixed;inset:0;z-index:6000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center}
+#phoneview iframe{width:390px;height:844px;max-height:92vh;border:0;background:var(--bg);box-shadow:0 0 0 1px var(--fg)}
+#phoneview .x{position:absolute;top:14px;right:20px;font:inherit;font-size:var(--t12);color:#fff;background:none;border:0;cursor:pointer}
+@media (max-width:900px){#index .head{flex-direction:row;justify-content:flex-start}}

@@ -12,7 +12,7 @@
   const nofixed = () => NOFIXED_BASE || narrow.matches;   // phones too
   root.classList.toggle("nofixed", nofixed());
   narrow.addEventListener("change", () => root.classList.toggle("nofixed", nofixed()));
-  const LAYERED = ".flip, #index a, #srcs a, #index .reset, #index .scale button, #index .scale span, main p, main h1, main h2, main figcaption, main .pending, main .row > div";
+  const LAYERED = ".flip, #index a, #srcs a, #index .reset, #index .scale button, #index .scale span, #index .view button, main p, main h1, main h2, main figcaption, main .pending, main .row > div";
   function syncLayers() {   // tell each visible text element where it sits on screen
     if (!nofixed()) return;
     const H = innerHeight;
@@ -26,6 +26,18 @@
   // Which kind of pointer was used last (mouse, pen or touch), and double-tap detection for touch screens.
   var lastPointer = "mouse", lastTap = { t: 0, x: 0, y: 0 };
   addEventListener("pointerdown", e => { lastPointer = e.pointerType; }, true);
+
+  // --- Invert: double-click the white box (double-tap the window on phones) to swap the page and box colours.
+  try { if (localStorage.getItem("ns-invert") === "1") root.classList.add("inverted"); } catch (e) {}
+  function invert() {
+    const on = root.classList.toggle("inverted");
+    try { if (on) localStorage.setItem("ns-invert", "1"); else localStorage.removeItem("ns-invert"); } catch (e) {}
+  }
+  function inWhite(x, y) {   // is this point on the white box?
+    const cs = getComputedStyle(root), v = p => parseFloat(cs.getPropertyValue(p)) || 0;
+    const bx = v("--x"), by = v("--y");
+    return x >= bx && x <= bx + v("--w") && y >= by && y <= by + v("--h");
+  }
 
   // --- White box, fixed to the screen. Stored as fractions of the window so it keeps its place when the window resizes.
   const MIN = 12;
@@ -178,11 +190,17 @@
   document.addEventListener("pointerdown", e => { if (selFig && !e.target.closest("figure")) selectFig(null); });
   document.addEventListener("keydown", e => { if (e.key === "Escape") selectFig(null); });
   // Double-click anywhere lets go of whatever is selected (an image or the white box), even when the box fills the page.
-  document.addEventListener("dblclick", () => { selectFig(null); select(false); getSelection && getSelection().removeAllRanges(); });
+  document.addEventListener("dblclick", e => {
+    if (inWhite(e.clientX, e.clientY) && !e.target.closest("figure, a, button, #box .h")) invert();
+    selectFig(null); select(false); getSelection && getSelection().removeAllRanges();
+  });
   document.addEventListener("pointerup", e => {   // double-tap = let go, like double-click
     if (e.pointerType !== "touch") return;
     const now = performance.now();
-    if (now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) { selectFig(null); select(false); lastTap.t = 0; }
+    if (now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) {
+      if (inWhite(e.clientX, e.clientY) && !e.target.closest("figure, a, button")) invert();
+      selectFig(null); select(false); lastTap.t = 0;
+    }
     else lastTap = { t: now, x: e.clientX, y: e.clientY };
   });
   const drag = (el, onMove, onEnd) => el.addEventListener("pointerdown", e => {
@@ -235,6 +253,52 @@
     applyZoom(1);
     layout();
   });
+
+  // --- "Phone  Web" next to Index.
+  // On a phone: Web shows the full computer version (laid out 1280px wide, zoomed to fit), remembered; Phone goes back.
+  // On a computer: Phone opens a phone-sized preview of this page; Web (or ×, Esc, a click outside) closes it.
+  const inFrame = window.self !== window.top;
+  const phoneDevice = matchMedia("(pointer:coarse)").matches && Math.min(screen.width, screen.height) < 900;
+  const vp = document.querySelector('meta[name="viewport"]');
+  let stored = null;
+  try { stored = localStorage.getItem("ns-view"); } catch (e) {}
+  if (phoneDevice && !inFrame && stored === "web") vp.setAttribute("content", "width=1280");
+  const viewNow = () => inFrame ? "phone" : phoneDevice ? (stored === "web" ? "web" : "phone") : (narrow.matches ? "phone" : "web");
+  const markView = () => index.querySelectorAll(".view button").forEach(b => b.classList.toggle("on", b.dataset.view === viewNow()));
+  function phonePreview() {
+    if (document.getElementById("phoneview")) return;
+    // open at whichever project is on screen right now
+    const mid = innerHeight * 0.45;
+    const sec = [...document.querySelectorAll("main section[id]")].find(s => { const r = s.getBoundingClientRect(); return r.top <= mid && r.bottom > mid; });
+    const cur = sec ? { hash: "#" + sec.id } : null;
+    const page = location.pathname.split("/").pop() || "index.html";
+    const pv = document.createElement("div");
+    pv.id = "phoneview";
+    pv.innerHTML = '<button type="button" class="x" aria-label="Close the phone preview">×</button><iframe title="Phone version"></iframe>';
+    pv.querySelector("iframe").src = page + "?frame" + (cur && cur.hash ? cur.hash : "");
+    const close = () => { pv.remove(); removeEventListener("keydown", esc); };
+    const esc = e => { if (e.key === "Escape") close(); };
+    pv.addEventListener("click", e => { if (e.target === pv || e.target.closest(".x")) close(); });
+    addEventListener("keydown", esc);
+    addEventListener("message", e => { if (e.data === "ns-close-phone") close(); });
+    document.body.appendChild(pv);
+  }
+  index.querySelectorAll(".view button").forEach(b => b.addEventListener("click", () => {
+    const want = b.dataset.view;
+    if (inFrame) { if (want === "web") parent.postMessage("ns-close-phone", "*"); return; }
+    if (phoneDevice) {
+      stored = want === "web" ? "web" : null;
+      try { if (stored) localStorage.setItem("ns-view", "web"); else localStorage.removeItem("ns-view"); } catch (e) {}
+      vp.setAttribute("content", want === "web" ? "width=1280" : "width=device-width, initial-scale=1");
+      setTimeout(() => { layout(); markView(); }, 100);
+      return;
+    }
+    if (want === "phone") phonePreview();
+  }));
+  narrow.addEventListener("change", markView);
+  markView();
+  // inside the phone preview, Esc closes it too (keys go to the preview once you've clicked in it)
+  if (inFrame) addEventListener("keydown", e => { if (e.key === "Escape") parent.postMessage("ns-close-phone", "*"); });
 
   // --- Source numbers: one per image, level with its top edge, opening the full-size file.
   function placeSources() {
