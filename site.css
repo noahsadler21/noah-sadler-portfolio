@@ -212,3 +212,13 @@ html.inverted{--bg:#fff;--fg:#4b4b4d;--bg-q:rgba(255,255,255,.45);--fg-q:rgba(75
 
 /* start screen: everything piled on the first screen at 25% until Sort; it still scrolls, since scaling an image pushes the ones below it down */
 html.piled #srcs{display:none}
+
+/* phones open scattered until Sort: each image at a random width (--pw), offset (--px), depth (--pz) and overlap (--pm) */
+@media (max-width:900px){
+  html.scattered main{zoom:var(--zoom,1)!important;max-width:calc(85ch / var(--zoom,1))}
+  html.scattered figure{width:var(--pw,100%)!important;left:var(--px,0px)!important;z-index:var(--pz,auto)!important}
+  html.scattered figure.ov{margin-top:var(--pm,3.2em)}
+  html.scattered #srcs{display:none}
+  html.scattered #index .acts{display:inline!important}
+  html.scattered #index .reset{display:none}
+}

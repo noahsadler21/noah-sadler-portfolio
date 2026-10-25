@@ -283,9 +283,31 @@
     }
     topZ = 70; figs.forEach(paint); layout();
   }
+  // Phones: the column opens scattered instead, each image at a random width and offset, overlapping the one above
+  // at 25% (it still scrolls, and a tap still opens the full size). Sort, under the Index, goes back to 100%.
+  const SCATTER = ["--pw", "--px", "--pm", "--pz"], PHONE_Z = 0.25;
+  function scatter() {
+    root.classList.add("scattered");
+    applyZoom(PHONE_Z);   // scaled down like the computer start, so more images fit on each screen
+    for (const f of figs) {
+      const w = 20 + Math.random() * 45;   // % of the column
+      f.style.setProperty("--pw", w.toFixed(1) + "%");
+      f.style.setProperty("--px", (Math.random() * (100 - w)).toFixed(1) + "%");
+      f.style.setProperty("--pz", 5 + Math.floor(Math.random() * 60));
+      // only overlap another image, never the text above a project's first image
+      const over = f.previousElementSibling && f.previousElementSibling.matches("figure");
+      f.classList.toggle("ov", !!over);
+      if (over) f.style.setProperty("--pm", -Math.round(innerHeight / PHONE_Z * 0.12 * Math.random()) + "px");
+    }
+    layout();
+  }
+  function unscatter() {
+    root.classList.remove("scattered");
+    figs.forEach(f => { SCATTER.forEach(p => f.style.removeProperty(p)); f.classList.remove("ov"); });
+  }
   function sort() {
     imgs = {}; selectFig(null); figs.forEach(paint);
-    root.classList.remove("piled");
+    root.classList.remove("piled"); unscatter();
     try { localStorage.removeItem("ns-img"); sessionStorage.setItem("ns-sorted", "1"); } catch (e) {}
     applyZoom(1);
     scrollTo(0, 0);
@@ -300,14 +322,16 @@
   });
   // while piled, following a link to a section sorts the page first so the jump has somewhere to land
   document.addEventListener("click", e => {
-    if (root.classList.contains("piled") && e.target.closest('a[href^="#"], a[href*="index.html#"]')) sort();
+    if (root.matches(".piled, .scattered") && e.target.closest('a[href^="#"], a[href*="index.html#"]')) sort();
   }, true);
   let sortedThisVisit = false;
   try { sortedThisVisit = sessionStorage.getItem("ns-sorted") === "1"; } catch (e) {}
-  if (!narrow.matches && !sortedThisVisit && document.body.classList.contains("portfolio") && !location.hash)
-    setTimeout(pile, 0);   // right after setup: sizes are known from the image dimensions
-  // phones never pile; if the window narrows while piled, sort it
-  narrow.addEventListener("change", () => { if (narrow.matches && root.classList.contains("piled")) sort(); });
+  if (!sortedThisVisit && document.body.classList.contains("portfolio") && !location.hash) {
+    if (narrow.matches) setTimeout(scatter, 0);
+    else setTimeout(pile, 0);   // right after setup: sizes are known from the image dimensions
+  }
+  // the pile is for computers and the scatter for phones; switching between the two sorts the page
+  narrow.addEventListener("change", () => { if (root.matches(".piled, .scattered")) sort(); });
 
   // --- "Phone  Web" next to Index.
   // On a phone: Web shows the full computer version (laid out 1280px wide, zoomed to fit), remembered; Phone goes back.
