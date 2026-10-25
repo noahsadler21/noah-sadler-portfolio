@@ -210,6 +210,5 @@ html.inverted{--bg:#fff;--fg:#4b4b4d;--bg-q:rgba(255,255,255,.45);--fg-q:rgba(75
 #phoneview .x{position:absolute;top:14px;right:20px;font:inherit;font-size:var(--t12);color:#fff;background:none;border:0;cursor:pointer}
 @media (max-width:900px){#index .head{flex-direction:row;justify-content:flex-start}}
 
-/* start screen: everything piled on the first screen at 25%, no scrolling until Sort */
-html.piled,html.piled body{overflow:hidden}
+/* start screen: everything piled on the first screen at 25% until Sort; it still scrolls, since scaling an image pushes the ones below it down */
 html.piled #srcs{display:none}

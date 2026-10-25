@@ -253,7 +253,7 @@
 
   // --- Reset (bottom of the Index): images back in the column at their own size, the white box back to full screen.
   // --- Start screen (computers): the page opens at 25% with every image piled across the first screen at a random
-  // size, spot and depth, and the page doesn't scroll. Sort puts everything in order at 100% for the rest of the visit;
+  // size, spot and depth. It still scrolls, since scaling an image pushes the ones below it down. Sort puts everything in order at 100% for the rest of the visit;
   // Reset goes back to the pile; an Index link sorts first, then jumps.
   function pile() {
     applyZoom(0.25);
