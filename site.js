@@ -12,7 +12,7 @@
   const nofixed = () => NOFIXED_BASE || narrow.matches;   // phones too
   root.classList.toggle("nofixed", nofixed());
   narrow.addEventListener("change", () => root.classList.toggle("nofixed", nofixed()));
-  const LAYERED = ".flip, #index a, #srcs a, #index .reset, #index .scale button, #index .scale span, #index .view button, main p, main h1, main h2, main figcaption, main .pending, main .row > div";
+  const LAYERED = ".flip, #index a, #srcs a, #index .reset, #index .sort, #index .scale button, #index .scale span, #index .view button, main p, main h1, main h2, main figcaption, main .pending, main .row > div";
   function syncLayers() {   // tell each visible text element where it sits on screen
     if (!nofixed()) return;
     const H = innerHeight;
@@ -252,13 +252,39 @@
   }
 
   // --- Reset (bottom of the Index): images back in the column at their own size, the white box back to full screen.
-  index.querySelector(".reset").addEventListener("click", () => {
+  // --- The site opens messy: every image at a random size and spot (a new arrangement each visit).
+  // Sort puts them back in order for the rest of the visit; Reset goes back to how the site opens.
+  function mess() {
+    imgs = {}; figs.forEach(paint);                 // measure everything in its sorted place first
+    const W = innerWidth, H = innerHeight, z = Z();
+    const placed = figs.map(f => ({ f, r: f.querySelector("img, video, .pending").getBoundingClientRect() }));
+    for (const { f, r } of placed) {
+      const k = 0.5 + Math.random() * 1.0;                         // half to one and a half times its size
+      const w = Math.min(r.width * k, W * 0.9);
+      const left = 16 + Math.random() * Math.max(0, W - w - 32);   // anywhere across the screen, never off it
+      imgs[f.dataset.n] = { k: +(w / r.width).toFixed(3), dx: Math.round((left - r.left) / z),
+                            dy: Math.round((Math.random() * 0.5 - 0.15) * H / z), z: 5 + Math.floor(Math.random() * 40) };
+    }
+    topZ = 50; figs.forEach(paint); layout();
+  }
+  function sort() {
     imgs = {}; selectFig(null); figs.forEach(paint);
-    fx = 0; fy = 0; fw = 1; fh = 1; box.classList.remove("selected");
-    try { localStorage.removeItem("ns-img"); localStorage.removeItem("ns-box2"); } catch (e) {}
-    applyZoom(1);
+    try { localStorage.removeItem("ns-img"); sessionStorage.setItem("ns-sorted", "1"); } catch (e) {}
     layout();
+  }
+  index.querySelector(".sort").addEventListener("click", sort);
+  index.querySelector(".reset").addEventListener("click", () => {
+    selectFig(null);
+    fx = 0; fy = 0; fw = 1; fh = 1; box.classList.remove("selected");
+    try { localStorage.removeItem("ns-img"); localStorage.removeItem("ns-box2"); sessionStorage.removeItem("ns-sorted"); } catch (e) {}
+    applyZoom(1);
+    if (!narrow.matches) mess(); else { imgs = {}; figs.forEach(paint); layout(); }
   });
+  // on arrival (computers): messy, unless you arranged images yourself or sorted them during this visit
+  let sortedThisVisit = false;
+  try { sortedThisVisit = sessionStorage.getItem("ns-sorted") === "1"; } catch (e) {}
+  if (!narrow.matches && !Object.keys(imgs).length && !sortedThisVisit && document.body.classList.contains("portfolio"))
+    setTimeout(mess, 0);   // right after setup: sizes are known from the image dimensions, no need to wait for loading
 
   // --- "Phone  Web" next to Index.
   // On a phone: Web shows the full computer version (laid out 1280px wide, zoomed to fit), remembered; Phone goes back.

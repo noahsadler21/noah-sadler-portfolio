@@ -151,8 +151,9 @@ figure .t.ne{right:calc(-8 * var(--u));top:calc(-8 * var(--u));cursor:nesw-resiz
 #index .scale{display:block;margin-top:.5em;white-space:nowrap}
 #index .scale button,#index .scale span{font:inherit;padding:0 .15em;border:0;cursor:pointer;color:transparent;background:linear-gradient(var(--bg),var(--bg)) var(--x) var(--y) / var(--w) var(--h) no-repeat fixed, var(--fg);-webkit-background-clip:text;background-clip:text}
 #index .scale span{cursor:default;font-variant-numeric:tabular-nums}
-#index .reset{display:block;margin-top:1.2em;font:inherit;padding:0;border:0;background:none;cursor:pointer;text-align:right;width:100%;color:transparent;background:linear-gradient(var(--bg),var(--bg)) var(--x) var(--y) / var(--w) var(--h) no-repeat fixed, var(--fg);-webkit-background-clip:text;background-clip:text}
-@media (max-width:900px){#index .reset{display:inline;width:auto;margin:0 1em 0 0}#index .scale{display:inline;margin:0}}
+#index .acts{display:flex;justify-content:flex-end;gap:1em;margin-top:1.2em}
+#index .reset,#index .sort{display:inline;font:inherit;padding:0;border:0;background:none;cursor:pointer;color:transparent;background:linear-gradient(var(--bg),var(--bg)) var(--x) var(--y) / var(--w) var(--h) no-repeat fixed, var(--fg);-webkit-background-clip:text;background-clip:text}
+@media (max-width:900px){#index .acts{display:none}#index .scale{display:inline;margin:0}}
 /* touch screens: a swipe on an image still scrolls the page; tap to select it, then drag to move. Tabs get finger-sized. */
 @media (pointer:coarse){
   figure:hover .t{display:none}figure.sel .t{display:block}
@@ -177,7 +178,7 @@ main p.intro{max-width:none;width:calc((100vw - var(--margin) - 5em) / var(--zoo
 
 /* Safari and every iPhone/iPad browser: background-attachment:fixed is unsupported or unreliable there, so each text
    element's layer is placed by the script (--ox/--oy = the element's position on screen) and scrolls with the element. */
-html.nofixed .flip,html.nofixed #index a,html.nofixed #srcs a,html.nofixed #index .reset,html.nofixed #index .scale button,html.nofixed #index .scale span,html.nofixed #index .view button,html.nofixed #index .view button:not(.on),
+html.nofixed .flip,html.nofixed #index a,html.nofixed #srcs a,html.nofixed #index .reset,html.nofixed #index .sort,html.nofixed #index .scale button,html.nofixed #index .scale span,html.nofixed #index .view button,html.nofixed #index .view button:not(.on),
 html.nofixed #index.has-current .inner > a:not(.lead):not([aria-current]){background-attachment:scroll;background-position:calc(var(--x) - var(--ox, 0px)) calc(var(--y) - var(--oy, 0px))}
 html.nofixed main :is(p, h1, h2, figcaption, .pending, .row > div){background-attachment:scroll;background-position:calc((var(--x) - var(--ox, 0px)) / var(--zoom, 1)) calc((var(--y) - var(--oy, 0px)) / var(--zoom, 1))}
 /* iPhone: no double-tap page zoom (double-tap lets go of a selection), no save-image menu while moving images */
@@ -189,7 +190,7 @@ figure img{-webkit-touch-callout:none}
    and their numbers sit on the right edge. ---- */
 @media (max-width:900px){
   #box{display:none}
-  #index .reset,#index .scale{display:none!important}
+  #index .acts,#index .scale{display:none!important}
   main{zoom:1!important}
   figure{left:0!important;top:0!important;width:100%!important;z-index:auto!important;box-shadow:none!important}
   figure .t{display:none!important}
