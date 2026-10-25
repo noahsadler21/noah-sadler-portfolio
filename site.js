@@ -187,6 +187,7 @@
     queueTabs();
   }
   let selFig = null;
+  var phoneDragged = false;   // set by the phone pile's drag, so the tap that ends a drag doesn't open the image
   function selectFig(f) {
     if (selFig && selFig !== f) selFig.classList.remove("sel");
     selFig = f;
@@ -229,7 +230,11 @@
     drag(media, mover, () => { saveImgs(); layout(); });
     // touch: a tap selects the image (its tabs appear); dragging then moves it
     media.addEventListener("click", () => {
-      if (narrow.matches) { if (f.dataset.full) open(f.dataset.full, "_blank", "noopener"); return; }   // phones: tap = full size
+      if (narrow.matches) {   // phones: tap = full size (unless the tap was the end of a drag in the pile)
+        if (phoneDragged) { phoneDragged = false; return; }
+        if (f.dataset.full) open(f.dataset.full, "_blank", "noopener");
+        return;
+      }
       if (lastPointer === "touch") selectFig(f);
     });
     // scale: four corner tabs
@@ -307,7 +312,31 @@
       f.style.setProperty("--px", Math.round((left - r.left) / z) + "px");
       f.style.setProperty("--py", Math.round((top - r.top) / z) + "px");
     }
+    topZ = 70;
     layout();
+  }
+  // In the phone pile a finger moves an image straight away (the last one touched comes to the front);
+  // a tap without moving still opens it full size. Scrolling works from anywhere off the images.
+  for (const f of figs) {
+    const m = f.querySelector("img, video, .pending");
+    m.addEventListener("pointerdown", e => {
+      if (!narrow.matches || !root.classList.contains("scattered") || e.button > 0) return;
+      const x0 = e.clientX, y0 = e.clientY, z = Z();
+      const px = parseFloat(f.style.getPropertyValue("--px")) || 0, py = parseFloat(f.style.getPropertyValue("--py")) || 0;
+      f.style.setProperty("--pz", ++topZ);
+      phoneDragged = false;
+      try { m.setPointerCapture(e.pointerId); } catch (err) {}
+      const move = ev => {
+        const dx = ev.clientX - x0, dy = ev.clientY - y0;
+        if (!phoneDragged && Math.hypot(dx, dy) < 6) return;
+        phoneDragged = true;
+        f.style.setProperty("--px", Math.round(px + dx / z) + "px"); f.style.setProperty("--py", Math.round(py + dy / z) + "px");
+        syncLayers();
+      };
+      const up = () => { m.removeEventListener("pointermove", move); m.removeEventListener("pointerup", up); m.removeEventListener("pointercancel", up); layout(); };
+      m.addEventListener("pointermove", move); m.addEventListener("pointerup", up); m.addEventListener("pointercancel", up);
+      e.preventDefault();
+    });
   }
   function unscatter() {
     root.classList.remove("scattered");

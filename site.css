@@ -218,6 +218,7 @@ html.piled #srcs{display:none}
   html.scattered main{zoom:var(--zoom,1)!important;max-width:calc(85ch / var(--zoom,1))}
   html.scattered figure{width:var(--pw,100%)!important;left:var(--px,0px)!important;top:var(--py,0px)!important;z-index:var(--pz,auto)!important}
   html.scattered #srcs{display:none}
+  html.scattered figure img,html.scattered figure video{touch-action:none;cursor:move}
   html.scattered #index .acts{display:inline!important}
   html.scattered #index .reset{display:none}
 }
