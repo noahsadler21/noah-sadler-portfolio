@@ -252,39 +252,62 @@
   }
 
   // --- Reset (bottom of the Index): images back in the column at their own size, the white box back to full screen.
-  // --- The site opens messy: every image at a random size and spot (a new arrangement each visit).
-  // Sort puts them back in order for the rest of the visit; Reset goes back to how the site opens.
-  function mess() {
-    imgs = {}; figs.forEach(paint);                 // measure everything in its sorted place first
-    const W = innerWidth, H = innerHeight, z = Z();
-    const placed = figs.map(f => ({ f, r: f.querySelector("img, video, .pending").getBoundingClientRect() }));
-    for (const { f, r } of placed) {
-      const k = 0.5 + Math.random() * 1.0;                         // half to one and a half times its size
-      const w = Math.min(r.width * k, W * 0.9);
-      const left = 16 + Math.random() * Math.max(0, W - w - 32);   // anywhere across the screen, never off it
-      imgs[f.dataset.n] = { k: +(w / r.width).toFixed(3), dx: Math.round((left - r.left) / z),
-                            dy: Math.round((Math.random() * 0.5 - 0.15) * H / z), z: 5 + Math.floor(Math.random() * 40) };
+  // --- Start screen (computers): the page opens at 25% with every image piled across the first screen at a random
+  // size, spot and depth, and the page doesn't scroll. Sort puts everything in order at 100% for the rest of the visit;
+  // Reset goes back to the pile; an Index link sorts first, then jumps.
+  function pile() {
+    applyZoom(0.25);
+    imgs = {}; selectFig(null); figs.forEach(paint);   // measure each image in its sorted place at this scale
+    scrollTo(0, 0);
+    root.classList.add("piled");
+    const W = root.clientWidth, H = innerHeight, z = Z();
+    const xMin = index.getBoundingClientRect().right + 16, yMin = brief.getBoundingClientRect().bottom + 8;
+    const media = f => f.querySelector("img, video, .pending");
+    // 1) sizes first: scaling an image changes its height in the flow, which moves every image below it
+    for (const f of figs) {
+      const r = media(f).getBoundingClientRect();
+      if (!r.width) continue;
+      const k = 0.8 + Math.random() * 1.4;
+      const w = Math.min(r.width * k, (W - xMin) * 0.6);
+      imgs[f.dataset.n] = { k: +(w / r.width).toFixed(3), dx: 0, dy: 0, z: 5 + Math.floor(Math.random() * 60) };
     }
-    topZ = 50; figs.forEach(paint); layout();
+    figs.forEach(paint);
+    // 2) then measure where each now sits and offset it to a random spot on the first screen
+    for (const f of figs) {
+      const s = imgs[f.dataset.n];
+      if (!s) continue;
+      const r = media(f).getBoundingClientRect();
+      const left = xMin + Math.random() * Math.max(0, W - xMin - r.width - 16);
+      const top = yMin + Math.random() * Math.max(0, H - yMin - r.height - 16);
+      s.dx = Math.round((left - r.left) / z); s.dy = Math.round((top - r.top) / z);
+    }
+    topZ = 70; figs.forEach(paint); layout();
   }
   function sort() {
     imgs = {}; selectFig(null); figs.forEach(paint);
+    root.classList.remove("piled");
     try { localStorage.removeItem("ns-img"); sessionStorage.setItem("ns-sorted", "1"); } catch (e) {}
+    applyZoom(1);
+    scrollTo(0, 0);
     layout();
   }
   index.querySelector(".sort").addEventListener("click", sort);
   index.querySelector(".reset").addEventListener("click", () => {
-    selectFig(null);
     fx = 0; fy = 0; fw = 1; fh = 1; box.classList.remove("selected");
     try { localStorage.removeItem("ns-img"); localStorage.removeItem("ns-box2"); sessionStorage.removeItem("ns-sorted"); } catch (e) {}
-    applyZoom(1);
-    if (!narrow.matches) mess(); else { imgs = {}; figs.forEach(paint); layout(); }
+    if (!narrow.matches && document.body.classList.contains("portfolio")) pile();
+    else { imgs = {}; selectFig(null); figs.forEach(paint); applyZoom(1); layout(); }
   });
-  // on arrival (computers): messy, unless you arranged images yourself or sorted them during this visit
+  // while piled, following a link to a section sorts the page first so the jump has somewhere to land
+  document.addEventListener("click", e => {
+    if (root.classList.contains("piled") && e.target.closest('a[href^="#"], a[href*="index.html#"]')) sort();
+  }, true);
   let sortedThisVisit = false;
   try { sortedThisVisit = sessionStorage.getItem("ns-sorted") === "1"; } catch (e) {}
-  if (!narrow.matches && !Object.keys(imgs).length && !sortedThisVisit && document.body.classList.contains("portfolio"))
-    setTimeout(mess, 0);   // right after setup: sizes are known from the image dimensions, no need to wait for loading
+  if (!narrow.matches && !sortedThisVisit && document.body.classList.contains("portfolio") && !location.hash)
+    setTimeout(pile, 0);   // right after setup: sizes are known from the image dimensions
+  // phones never pile; if the window narrows while piled, sort it
+  narrow.addEventListener("change", () => { if (narrow.matches && root.classList.contains("piled")) sort(); });
 
   // --- "Phone  Web" next to Index.
   // On a phone: Web shows the full computer version (laid out 1280px wide, zoomed to fit), remembered; Phone goes back.

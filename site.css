@@ -209,3 +209,7 @@ html.inverted{--bg:#fff;--fg:#4b4b4d;--bg-q:rgba(255,255,255,.45);--fg-q:rgba(75
 #phoneview iframe{width:390px;height:844px;max-height:92vh;border:0;background:var(--bg);box-shadow:0 0 0 1px var(--fg)}
 #phoneview .x{position:absolute;top:14px;right:20px;font:inherit;font-size:var(--t12);color:#fff;background:none;border:0;cursor:pointer}
 @media (max-width:900px){#index .head{flex-direction:row;justify-content:flex-start}}
+
+/* start screen: everything piled on the first screen at 25%, no scrolling until Sort */
+html.piled,html.piled body{overflow:hidden}
+html.piled #srcs{display:none}
