@@ -283,27 +283,35 @@
     }
     topZ = 70; figs.forEach(paint); layout();
   }
-  // Phones: the column opens scattered instead, each image at a random width and offset, overlapping the one above
-  // at 25% (it still scrolls, and a tap still opens the full size). Sort, under the Index, goes back to 100%.
-  const SCATTER = ["--pw", "--px", "--pm", "--pz"], PHONE_Z = 0.25;
+  // Phones: the same pile at 25%, every image at a random size, spot and depth on the first screen below the Index
+  // (it still scrolls, and a tap still opens the full size). Sort, under the Index, goes back to 100%.
+  const SCATTER = ["--pw", "--px", "--py", "--pz"], PHONE_Z = 0.25;
   function scatter() {
     root.classList.add("scattered");
-    applyZoom(PHONE_Z);   // scaled down like the computer start, so more images fit on each screen
+    applyZoom(PHONE_Z);
+    scrollTo(0, 0);
+    const W = root.clientWidth, H = innerHeight, z = Z();
+    const yMin = index.getBoundingClientRect().bottom + 8;
+    const media = f => f.querySelector("img, video, .pending");
+    // 1) sizes first (a size changes the image's height in the column, which moves every image below it)
     for (const f of figs) {
-      const w = 20 + Math.random() * 45;   // % of the column
-      f.style.setProperty("--pw", w.toFixed(1) + "%");
-      f.style.setProperty("--px", (Math.random() * (100 - w)).toFixed(1) + "%");
+      f.style.setProperty("--pw", (25 + Math.random() * 45).toFixed(1) + "%");   // of the column
       f.style.setProperty("--pz", 5 + Math.floor(Math.random() * 60));
-      // only overlap another image, never the text above a project's first image
-      const over = f.previousElementSibling && f.previousElementSibling.matches("figure");
-      f.classList.toggle("ov", !!over);
-      if (over) f.style.setProperty("--pm", -Math.round(innerHeight / PHONE_Z * 0.12 * Math.random()) + "px");
+    }
+    // 2) then measure where each now sits and move it to a random spot on the first screen
+    for (const f of figs) {
+      const r = media(f).getBoundingClientRect();
+      if (!r.width) continue;
+      const left = 8 + Math.random() * Math.max(0, W - r.width - 16);
+      const top = yMin + Math.random() * Math.max(0, H - yMin - r.height - 8);
+      f.style.setProperty("--px", Math.round((left - r.left) / z) + "px");
+      f.style.setProperty("--py", Math.round((top - r.top) / z) + "px");
     }
     layout();
   }
   function unscatter() {
     root.classList.remove("scattered");
-    figs.forEach(f => { SCATTER.forEach(p => f.style.removeProperty(p)); f.classList.remove("ov"); });
+    figs.forEach(f => SCATTER.forEach(p => f.style.removeProperty(p)));
   }
   function sort() {
     imgs = {}; selectFig(null); figs.forEach(paint);
